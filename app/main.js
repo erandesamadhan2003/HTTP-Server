@@ -2,12 +2,11 @@
 import net from "net";
 
 console.log("Logs from your program will appear here!");
-
 const server = net.createServer((socket) => {
     socket.on("data", (data) => {
         //  request data of the client
         console.log(data.toString());
-
+        
         // Write the HTTP 200 OK respone
         // HTTP/1.1 version of the http protocol
         // 200 ok the status code and the status message. 200 means the success
