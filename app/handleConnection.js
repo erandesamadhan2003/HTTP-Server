@@ -11,7 +11,8 @@ if (dirIndex !== -1 && args[dirIndex + 1]) {
 
 export const handleConnection = (socket, data) => {
     const request = data.toString();
-    const lines = request.split('\r\n');
+    const [requestHeaders, body] = request.split('\r\n\r\n');
+    const lines = requestHeaders.split('\r\n');
     const [method, url, httpVersion] = lines[0].split(" ");
 
     const headers = {};
@@ -21,9 +22,9 @@ export const handleConnection = (socket, data) => {
 
         const colonIndex = line.indexOf(':');
         if (colonIndex > -1) {
-            const headerName = line.substring(0, colonIndex).trim();
+            const headerName = line.substring(0, colonIndex).trim().toLowerCase();
             const headerValue = line.substring(colonIndex + 1).trim();
-            headers[headerName.toLowerCase()] = headerValue;
+            headers[headerName] = headerValue;
         }
     }
 
@@ -34,7 +35,7 @@ export const handleConnection = (socket, data) => {
     if (url === "/" || url === '/index.html') {
         responseStatusLine = 'HTTP/1.1 200 OK\r\n';
     } else if (url.startsWith('/echo/')) {
-        const message = url.split('/')[2] || "";
+        const message = url.split('/echo/')[1] || "";
         responseStatusLine = 'HTTP/1.1 200 OK';
         responseHeaders = [
             "Content-Type: text/plain",
@@ -55,22 +56,29 @@ export const handleConnection = (socket, data) => {
         const filename = url.split('/files/')[1];
         const filePath = path.join(baseDirectory, filename);
 
-        if (fs.existsSync(filePath)) {
-            const fileData = fs.readFileSync(filePath);
-            responseStatusLine = 'HTTP/1.1 200 OK';
-            responseHeaders = [
-                "Content-Type: application/octet-stream",
-                `Content-Length: ${fileData.length}`,
-                "", ""
-            ];
-            responseBody = fileData;
-        } else {
-            responseStatusLine = 'HTTP/1.1 404 Not Found\r\n\r\n';
+        if (method === 'GET') {
+            if (fs.existsSync(filePath)) {
+                const fileData = fs.readFileSync(filePath);
+                responseStatusLine = 'HTTP/1.1 200 OK';
+                responseHeaders = [
+                    "Content-Type: application/octet-stream",
+                    `Content-Length: ${fileData.length}`,
+                    "", ""
+                ];
+                responseBody = fileData;
+            } else {
+                responseStatusLine = 'HTTP/1.1 404 Not Found\r\n\r\n';
+                socket.write(responseStatusLine);
+                socket.end();
+                return;
+            }
+        } else if (method === 'POST') {
+            fs.writeFileSync(filePath, body);
+            responseStatusLine = 'HTTP/1.1 201 Created\r\n\r\n';
             socket.write(responseStatusLine);
             socket.end();
             return;
         }
-
     } else {
         responseStatusLine = 'HTTP/1.1 404 Not Found\r\n\r\n';
         socket.write(responseStatusLine);
