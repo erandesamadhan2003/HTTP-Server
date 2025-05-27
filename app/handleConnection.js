@@ -1,31 +1,40 @@
-export const handleConnection = (socket, data) => {
-    // get the request
-    const request = data.toString();
+import fs from 'fs';
+import path from 'path';
 
+let baseDirectory = '.';
+
+const args = process.argv;
+const dirIndex = args.indexOf('--directory');
+if (dirIndex !== -1 && args[dirIndex + 1]) {
+    baseDirectory = args[dirIndex + 1];
+}
+
+export const handleConnection = (socket, data) => {
+    const request = data.toString();
     const lines = request.split('\r\n');
-    const [method, url, httpVersion] = lines[0].split(" ");  
-    
+    const [method, url, httpVersion] = lines[0].split(" ");
+
     const headers = {};
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
-        if (line === '') break; 
+        if (line === '') break;
 
         const colonIndex = line.indexOf(':');
         if (colonIndex > -1) {
             const headerName = line.substring(0, colonIndex).trim();
             const headerValue = line.substring(colonIndex + 1).trim();
-            headers[headerName.toLowerCase()] = headerValue; 
+            headers[headerName.toLowerCase()] = headerValue;
         }
     }
-    
+
     let responseStatusLine = '';
     let responseHeaders = [];
     let responseBody = '';
 
-    if(url === "/" || url === '/index.html') {
+    if (url === "/" || url === '/index.html') {
         responseStatusLine = 'HTTP/1.1 200 OK\r\n';
     } else if (url.startsWith('/echo/')) {
-        const message = url.split('/')[2] || ""
+        const message = url.split('/')[2] || "";
         responseStatusLine = 'HTTP/1.1 200 OK';
         responseHeaders = [
             "Content-Type: text/plain",
@@ -40,14 +49,38 @@ export const handleConnection = (socket, data) => {
             "Content-Type: text/plain",
             `Content-Length: ${userAgent.length}`,
             "", ""
-        ]
+        ];
         responseBody = userAgent;
+    } else if (url.startsWith('/files/')) {
+        const filename = url.split('/files/')[1];
+        const filePath = path.join(baseDirectory, filename);
+
+        if (fs.existsSync(filePath)) {
+            const fileData = fs.readFileSync(filePath);
+            responseStatusLine = 'HTTP/1.1 200 OK';
+            responseHeaders = [
+                "Content-Type: application/octet-stream",
+                `Content-Length: ${fileData.length}`,
+                "", ""
+            ];
+            responseBody = fileData;
+        } else {
+            responseStatusLine = 'HTTP/1.1 404 Not Found\r\n\r\n';
+            socket.write(responseStatusLine);
+            socket.end();
+            return;
+        }
+
     } else {
-        responseStatusLine = 'HTTP/1.1 404 Not Found\r\n';
+        responseStatusLine = 'HTTP/1.1 404 Not Found\r\n\r\n';
+        socket.write(responseStatusLine);
+        socket.end();
+        return;
     }
 
-    const completeResponse = `${responseStatusLine}\r\n${responseHeaders.join("\r\n")}${responseBody}`
-    console.log(completeResponse);
+    const headersText = responseHeaders.join('\r\n');
+    const completeResponse = `${responseStatusLine}\r\n${headersText}`;
     socket.write(completeResponse);
+    socket.write(responseBody);
     socket.end();
-}
+};
