@@ -51,39 +51,3 @@ export const handleConnection = (socket, data) => {
     socket.write(completeResponse);
     socket.end();
 }
-
-// {
-//         const request = data.toString();
-//         console.log(request);
-
-//         const lines = request.split('\r\n');
-//         const [method, url, httpVersion] = lines[0].split(" ");
-
-        
-//         const message = url.split('/')[2] || "";
-//         const headers = [
-//             "HTTP/1.1 200 OK",
-//             "Content-Type: text/plain",
-//             `Content-Length: ${message.length}`,
-//             "", ""
-//         ];
-
-//         if (url === '/' || url === '/index.html') {
-//             socket.write("HTTP/1.1 200 OK\r\n\r\n");
-
-//         } else if (url.startsWith('/echo/')) {
-//             socket.write(headers.join("\r\n") + message);
-
-//         } else if(url === "/user-agent") {
-//             for (const line of lines) {
-//                 if (line.startsWith('User-Agent: ')) {
-//                     const userAgent = line.substring('User-Agent: '.length).trim();
-//                     socket.write(headers.join("\r\n") + userAgent);
-//                 }
-//             }
-
-//         } else {
-//             socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
-//         }
-//         socket.end();
-//     }
