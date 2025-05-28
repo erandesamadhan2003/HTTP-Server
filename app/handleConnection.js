@@ -11,6 +11,7 @@ if (dirIndex !== -1 && args[dirIndex + 1]) {
 
 export const handleConnection = (socket, data) => {
     const request = data.toString();
+    console.log(request)
     const [requestHeaders, body] = request.split('\r\n\r\n');
     const lines = requestHeaders.split('\r\n');
     const [method, url, httpVersion] = lines[0].split(" ");
@@ -35,11 +36,14 @@ export const handleConnection = (socket, data) => {
     if (url === "/" || url === '/index.html') {
         responseStatusLine = 'HTTP/1.1 200 OK\r\n';
     } else if (url.startsWith('/echo/')) {
+        console.log(headers);
         const message = url.split('/echo/')[1] || "";
         responseStatusLine = 'HTTP/1.1 200 OK';
+        const encoding = headers['accept-encoding'] || "";
         responseHeaders = [
             "Content-Type: text/plain",
             `Content-Length: ${message.length}`,
+            encoding !== 'invalid-encoding' ? `Content-Encoding: ${encoding}` : '',
             "", ""
         ];
         responseBody = message;

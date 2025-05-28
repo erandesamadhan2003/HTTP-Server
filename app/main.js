@@ -2,10 +2,8 @@ import net from "net";
 import { handleConnection } from "./handleConnection.js";
 
 const server = net.createServer((socket) => {
-
     // handle connections
     socket.on("data", (data) => handleConnection(socket, data));
-
     socket.on("close", () => {
         socket.end();
     });
