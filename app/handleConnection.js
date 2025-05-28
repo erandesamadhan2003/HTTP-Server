@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import zlib from 'zlib';
 
 let baseDirectory = '.';
 
@@ -36,27 +37,44 @@ export const handleConnection = (socket, data) => {
     if (url === "/" || url === '/index.html') {
         responseStatusLine = 'HTTP/1.1 200 OK\r\n';
     } else if (url.startsWith('/echo/')) {
-        const message = url.split('/echo/')[1].toString() || "";
-        responseStatusLine = 'HTTP/1.1 200 OK';
+        const message = url.split('/echo/')[1] || "";
+        responseStatusLine = 'HTTP/1.1 200 OK\r\n';
         const acceptEncoding = headers['accept-encoding'] || "";
         const encodings = acceptEncoding.split(',').map(e => e.trim());
-        const isPresent = encodings.includes('gzip')
 
-        if (isPresent) {
+        if (encodings.includes('gzip')) {
+            const compressed = zlib.gzipSync(message);
+
             responseHeaders = [
                 "Content-Type: text/plain",
-                `Content-Length: ${responseBody.length}`,
+                `Content-Length: ${compressed.length}`,
                 "Content-Encoding: gzip",
-                "", ""
+                "Connection: close"
             ];
+
+            socket.write(responseStatusLine);
+            socket.write(responseHeaders.join('\r\n'));
+            socket.write('\r\n\r\n');
+
+            socket.write(compressed);
+
+            socket.end();
+            return;
         } else {
+            responseStatusLine = 'HTTP/1.1 200 OK\r\n';
             responseHeaders = [
                 "Content-Type: text/plain",
-                `Content-Length: ${message.length}`,
-                "", ""
+                `Content-Length: ${Buffer.byteLength(message, 'utf8')}`,  
+                "Connection: close"
             ];
+
+            socket.write(responseStatusLine);
+            socket.write(responseHeaders.join('\r\n'));
+            socket.write('\r\n\r\n');  
+            socket.write(message);
+            socket.end();
+            return;
         }
-        responseBody = message;
     } else if (url === '/user-agent') {
         responseStatusLine = 'HTTP/1.1 200 OK';
         const userAgent = headers['user-agent'] || "";
