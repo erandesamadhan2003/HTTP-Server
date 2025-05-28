@@ -36,16 +36,26 @@ export const handleConnection = (socket, data) => {
     if (url === "/" || url === '/index.html') {
         responseStatusLine = 'HTTP/1.1 200 OK\r\n';
     } else if (url.startsWith('/echo/')) {
-        console.log(headers);
-        const message = url.split('/echo/')[1] || "";
+        const message = url.split('/echo/')[1].toString() || "";
         responseStatusLine = 'HTTP/1.1 200 OK';
-        const encoding = headers['accept-encoding'] || "";
-        responseHeaders = [
-            "Content-Type: text/plain",
-            `Content-Length: ${message.length}`,
-            encoding !== 'invalid-encoding' ? `Content-Encoding: ${encoding}` : '',
-            "", ""
-        ];
+        const acceptEncoding = headers['accept-encoding'] || "";
+        const encodings = acceptEncoding.split(',').map(e => e.trim());
+        const isPresent = encodings.includes('gzip')
+
+        if (isPresent) {
+            responseHeaders = [
+                "Content-Type: text/plain",
+                `Content-Length: ${responseBody.length}`,
+                "Content-Encoding: gzip",
+                "", ""
+            ];
+        } else {
+            responseHeaders = [
+                "Content-Type: text/plain",
+                `Content-Length: ${message.length}`,
+                "", ""
+            ];
+        }
         responseBody = message;
     } else if (url === '/user-agent') {
         responseStatusLine = 'HTTP/1.1 200 OK';
@@ -90,9 +100,8 @@ export const handleConnection = (socket, data) => {
         return;
     }
 
-    const headersText = responseHeaders.join('\r\n');
-    const completeResponse = `${responseStatusLine}\r\n${headersText}`;
+    const completeResponse = `${responseStatusLine}\r\n${responseHeaders.join('\r\n')}${responseBody}`;
     socket.write(completeResponse);
-    socket.write(responseBody);
+
     socket.end();
 };
