@@ -1,14 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-import zlib from 'zlib';
-
-let baseDirectory = '.';
-
-const args = process.argv;
-const dirIndex = args.indexOf('--directory');
-if (dirIndex !== -1 && args[dirIndex + 1]) {
-    baseDirectory = args[dirIndex + 1];
-}
+import { handleEchoRequest, handleFileRequest, handleUserAgentRequest } from './sendResponse.js';
 
 export const handleConnection = (socket, data) => {
     const request = data.toString();
@@ -30,96 +20,27 @@ export const handleConnection = (socket, data) => {
         }
     }
 
-    let responseStatusLine = '';
-    let responseHeaders = [];
-    let responseBody = '';
+    switch (true) {
+        case (url === "/" || url === '/index.html'):
+            socket.write('HTTP/1.1 200 OK\r\n\r\n');
+            break;
 
-    if (url === "/" || url === '/index.html') {
-        responseStatusLine = 'HTTP/1.1 200 OK\r\n';
-    } else if (url.startsWith('/echo/')) {
-        const message = url.split('/echo/')[1] || "";
-        responseStatusLine = 'HTTP/1.1 200 OK\r\n';
-        const acceptEncoding = headers['accept-encoding'] || "";
-        const encodings = acceptEncoding.split(',').map(e => e.trim());
+        case url.startsWith('/echo/'):
+            handleEchoRequest(socket, headers, url);
+            break;
 
-        if (encodings.includes('gzip')) {
-            const compressed = zlib.gzipSync(message);
+        case (url === '/user-agent'):
+            handleUserAgentRequest(socket, headers);
+            break;
 
-            responseHeaders = [
-                "Content-Type: text/plain",
-                `Content-Length: ${compressed.length}`,
-                "Content-Encoding: gzip",
-                "Connection: close"
-            ];
+        case url.startsWith('/files/'):
+            handleFileRequest(socket, method, url, body);
+            break;
 
-            socket.write(responseStatusLine);
-            socket.write(responseHeaders.join('\r\n'));
-            socket.write('\r\n\r\n');
-
-            socket.write(compressed);
-
-            socket.end();
-            return;
-        } else {
-            responseStatusLine = 'HTTP/1.1 200 OK\r\n';
-            responseHeaders = [
-                "Content-Type: text/plain",
-                `Content-Length: ${Buffer.byteLength(message, 'utf8')}`,  
-                "Connection: close"
-            ];
-
-            socket.write(responseStatusLine);
-            socket.write(responseHeaders.join('\r\n'));
-            socket.write('\r\n\r\n');  
-            socket.write(message);
-            socket.end();
-            return;
-        }
-    } else if (url === '/user-agent') {
-        responseStatusLine = 'HTTP/1.1 200 OK';
-        const userAgent = headers['user-agent'] || "";
-        responseHeaders = [
-            "Content-Type: text/plain",
-            `Content-Length: ${userAgent.length}`,
-            "", ""
-        ];
-        responseBody = userAgent;
-    } else if (url.startsWith('/files/')) {
-        const filename = url.split('/files/')[1];
-        const filePath = path.join(baseDirectory, filename);
-
-        if (method === 'GET') {
-            if (fs.existsSync(filePath)) {
-                const fileData = fs.readFileSync(filePath);
-                responseStatusLine = 'HTTP/1.1 200 OK';
-                responseHeaders = [
-                    "Content-Type: application/octet-stream",
-                    `Content-Length: ${fileData.length}`,
-                    "", ""
-                ];
-                responseBody = fileData;
-            } else {
-                responseStatusLine = 'HTTP/1.1 404 Not Found\r\n\r\n';
-                socket.write(responseStatusLine);
-                socket.end();
-                return;
-            }
-        } else if (method === 'POST') {
-            fs.writeFileSync(filePath, body);
-            responseStatusLine = 'HTTP/1.1 201 Created\r\n\r\n';
-            socket.write(responseStatusLine);
-            socket.end();
-            return;
-        }
-    } else {
-        responseStatusLine = 'HTTP/1.1 404 Not Found\r\n\r\n';
-        socket.write(responseStatusLine);
-        socket.end();
-        return;
+        default:
+            socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+            break;
     }
 
-    const completeResponse = `${responseStatusLine}\r\n${responseHeaders.join('\r\n')}${responseBody}`;
-    socket.write(completeResponse);
-
-    socket.end();
+    if(headers['connection'] === 'close') socket.end();
 };
