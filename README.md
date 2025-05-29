@@ -191,4 +191,4 @@ MIT License - feel free to use this code for learning and personal projects.
 
 ---
 
-**Built with ❤️ using vanilla Node.js - no frameworks, just pure networking fundamentals!**
+**Built with using vanilla Node.js - no frameworks, just pure networking fundamentals!**
